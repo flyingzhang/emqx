@@ -204,11 +204,14 @@ clients(["show", ClientId]) ->
 clients(["kick", ClientId]) ->
     ok = emqx_cm:kick_session(bin(ClientId)),
     emqx_ctl:print("ok~n");
+clients(["kick", ClientId, Arg]) when Arg == "--retain-session"; Arg == "-r" ->
+    ok = emqx_cm:kick_session(bin(ClientId), #{retain_session => true}),
+    emqx_ctl:print("ok~n");
 clients(_) ->
     emqx_ctl:usage([
         {"clients list", "List all clients"},
         {"clients show <ClientId>", "Show a client"},
-        {"clients kick <ClientId>", "Kick out a client"}
+        {"clients kick <ClientId> [--retain-session|-r]", "Kick out a client (use --retain-session to keep session)"}
     ]).
 
 if_client(ClientId, Fun) ->

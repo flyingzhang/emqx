@@ -86,7 +86,8 @@
     handle_info/3,
     handle_timeout/3,
     disconnect/3,
-    terminate/3
+    terminate/3,
+    run_terminate_hooks/3
 ]).
 
 %% Will message handling

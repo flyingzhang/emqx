@@ -507,7 +507,7 @@ request_stepdown(Action, ConnMod, Pid) ->
             Err:Reason:St ->
                 handle_stepdown_exception(Err, Reason, St, ConnMod, Pid, Action)
         end,
-    case Action == kick orelse Action == discard of
+    case Action == kick orelse Action == discard orelse (is_tuple(Action) andalso element(1, Action) == kick) of
         true -> ok;
         _ -> Return
     end.
@@ -568,8 +568,7 @@ stale_channel_info(Pid) ->
 discard_session(ClientId, ChanPid) ->
     kick_session(discard, ClientId, ChanPid).
 
-kick_session(ClientId, ChanPid) ->
-    kick_session(kick, ClientId, ChanPid).
+
 
 %% @doc RPC Target @ emqx_cm_proto_v2:kick_session/3
 -spec do_kick_session(kick | discard, emqx_types:clientid(), chan_pid()) -> ok.
@@ -640,6 +639,11 @@ takeover_kick_session(ClientId, ChanPid) ->
     end.
 
 kick_session(ClientId) ->
+    kick_session(ClientId, #{}).
+
+kick_session(ClientId, ChanPid) when is_pid(ChanPid) ->
+    kick_session(kick, ClientId, ChanPid);
+kick_session(ClientId, Opts) when is_map(Opts) ->
     case lookup_channels(ClientId) of
         [] ->
             ?SLOG(
@@ -649,7 +653,7 @@ kick_session(ClientId) ->
             ),
             ok;
         ChanPids ->
-            kick_session_chans(ClientId, ChanPids)
+            kick_session_chans(ClientId, ChanPids, Opts)
     end.
 
 try_kick_session(ClientId) ->
@@ -948,3 +952,20 @@ kick_session_chans(ClientId, ChanPids) ->
             ok
     end,
     lists:foreach(fun(Pid) -> kick_session(ClientId, Pid) end, ChanPids).
+
+kick_session_chans(ClientId, ChanPids, Opts) ->
+    case length(ChanPids) > 1 of
+        true ->
+            ?SLOG(
+                warning,
+                #{
+                    msg => "more_than_one_channel_found",
+                    chan_pids => ChanPids
+                },
+                #{clientid => ClientId}
+            );
+        false ->
+            ok
+    end,
+    Action = case maps:size(Opts) of 0 -> kick; _ -> {kick, Opts} end,
+    lists:foreach(fun(Pid) -> kick_session(Action, ClientId, Pid) end, ChanPids).

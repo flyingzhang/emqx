@@ -308,13 +308,17 @@ destroy(#{clientid := ClientID}) ->
     destroy_session(ClientID).
 
 destroy_session(ClientID) ->
-    session_drop(ClientID, destroy).
+    emqx_cm_locker:trans(ClientID, fun(_) ->
+        session_drop(ClientID, destroy)
+    end).
 
 -spec kick_offline_session(emqx_types:clientid()) -> ok.
 kick_offline_session(ClientID) ->
     case emqx_persistent_message:is_persistence_enabled() of
         true ->
-            session_drop(ClientID, kicked);
+            emqx_cm_locker:trans(ClientID, fun(_) ->
+                session_drop(ClientID, kicked)
+            end);
         false ->
             ok
     end.

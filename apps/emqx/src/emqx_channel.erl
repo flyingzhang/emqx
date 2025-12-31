@@ -1111,30 +1111,39 @@ maybe_update_expiry_interval(
 maybe_update_expiry_interval(_Properties, Channel) ->
     Channel.
 
-process_kick(
-    Channel = #channel{
+process_kick(Channel) ->
+    process_kick(#{}, Channel).
+
+process_kick(Opts, Channel = #channel{
         conn_state = ConnState,
         conninfo = #{proto_ver := ProtoVer},
         session = Session
-    }
-) ->
-    emqx_session:destroy(Session),
+    }) ->
+    case maps:get(retain_session, Opts, false) of
+        true -> ok;
+        false -> emqx_session:destroy(Session)
+    end,
     Channel0 = maybe_publish_will_msg(kicked, Channel),
     Channel1 =
         case ConnState of
             connected -> ensure_disconnected(kicked, Channel0);
             _ -> Channel0
         end,
+    Reason =
+        case maps:get(retain_session, Opts, false) of
+            true -> kicked;
+            false -> {kicked, destroy}
+        end,
     case ProtoVer == ?MQTT_PROTO_V5 andalso ConnState == connected of
         true ->
             shutdown(
-                kicked,
+                Reason,
                 ok,
                 ?DISCONNECT_PACKET(?RC_ADMINISTRATIVE_ACTION),
                 Channel1
             );
         _ ->
-            shutdown(kicked, ok, Channel1)
+            shutdown(Reason, ok, Channel1)
     end.
 
 process_maybe_shutdown(
@@ -1484,6 +1493,18 @@ return_sub_unsub_ack(Packet, Channel) ->
     {reply, Reply :: term(), channel()}
     | {shutdown, Reason :: term(), Reply :: term(), channel()}
     | {shutdown, Reason :: term(), Reply :: term(), emqx_types:packet(), channel()}.
+handle_call({kick, Opts}, Channel = #channel{conn_state = ConnState}) when
+    ConnState =/= disconnected
+->
+    ?EXT_TRACE_BROKER_DISCONNECT(
+        ?EXT_TRACE_ATTR(
+            maps:merge(basic_attrs(Channel), disconnect_attrs(kick, Channel))
+        ),
+        fun() -> process_kick(Opts, Channel) end,
+        []
+    );
+handle_call({kick, Opts}, Channel) ->
+    process_kick(Opts, Channel);
 handle_call(kick, Channel = #channel{conn_state = ConnState}) when
     ConnState =/= disconnected
 ->
@@ -1585,6 +1606,21 @@ handle_call(Req, Channel) ->
 -spec handle_info(Info :: term(), channel()) ->
     ok | {ok, channel()} | {shutdown, Reason :: term(), channel()}.
 
+handle_info({kick, Opts}, Channel) ->
+    ?EXT_TRACE_BROKER_DISCONNECT(
+        ?EXT_TRACE_ATTR(
+            maps:merge(basic_attrs(Channel), disconnect_attrs(kick, Channel))
+        ),
+        fun() ->
+            case process_kick(Opts, Channel) of
+                {shutdown, Reason, _Reply, NChannel} ->
+                    {shutdown, Reason, NChannel};
+                {shutdown, Reason, _Reply, _Packet, NChannel} ->
+                    {shutdown, Reason, NChannel}
+            end
+        end,
+        []
+    );
 handle_info({subscribe, TopicFilters}, Channel) ->
     ?EXT_TRACE_BROKER_SUBSCRIBE(
         ?EXT_TRACE_ATTR(
@@ -1866,6 +1902,10 @@ terminate(_, #channel{conn_state = idle} = _Channel) ->
     ok;
 terminate(normal, Channel) ->
     run_terminate_hook(normal, Channel);
+terminate({shutdown, {kicked, destroy}}, Channel) ->
+    %% Session was explicitly destroyed in process_kick; run hooks but skip session:terminate
+    %% to prevent session resurrection via commit
+    run_terminate_hook_only(kicked, Channel);
 terminate({shutdown, Reason}, Channel) when
     Reason =:= expired orelse
         Reason =:= takenover orelse
@@ -1881,6 +1921,12 @@ run_terminate_hook(_Reason, #channel{session = undefined}) ->
     ok;
 run_terminate_hook(Reason, #channel{clientinfo = ClientInfo, session = Session}) ->
     emqx_session:terminate(ClientInfo, Reason, Session).
+
+%% Run session hooks without calling session impl terminate (no commit)
+run_terminate_hook_only(_Reason, #channel{session = undefined}) ->
+    ok;
+run_terminate_hook_only(Reason, #channel{clientinfo = ClientInfo, session = Session}) ->
+    emqx_session:run_terminate_hooks(ClientInfo, Reason, Session).
 
 %%--------------------------------------------------------------------
 %% Internal functions
