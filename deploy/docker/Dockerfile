@@ -17,27 +17,35 @@ FROM builder_${SOURCE_TYPE} AS builder
 ARG PROFILE=emqx
 ARG IS_ELIXIR=no
 ARG DEBUG
+ARG HTTP_PROXY=""
+ARG HTTPS_PROXY=""
 
 ENV EMQX_RELUP=false
 ENV EMQX_REL_FORM='docker'
+ENV http_proxy=${HTTP_PROXY}
+ENV https_proxy=${HTTPS_PROXY}
+ENV HTTP_PROXY=${HTTP_PROXY}
+ENV HTTPS_PROXY=${HTTPS_PROXY}
 
 WORKDIR /emqx/
 
-RUN mkdir -p /emqx-rel/emqx && \
-    if [ -f "/${PROFILE}.tar.gz" ]; then \
-      tar zxf "/${PROFILE}.tar.gz" -C /emqx-rel/emqx; \
-    else \
-      if [ -f rebar-git-cache.tar ]; then \
-        mkdir .cache && \
-        tar -xf rebar-git-cache.tar -C .cache && \
-        export REBAR_GIT_CACHE_DIR='/emqx/.cache' && \
-        export REBAR_GIT_CACHE_REF_AUTOFILL=0; \
-      fi && \
-      export EMQX_REL_PATH="/emqx/_build/${PROFILE}/rel/emqx" && \
-      git config --global --add safe.directory '*' && \
-      make ${PROFILE}-tgz && \
-      tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/emqx; \
-    fi
+RUN \
+  mkdir -p /emqx-rel/emqx && \
+  if [ -f "/${PROFILE}.tar.gz" ]; then \
+  tar zxf "/${PROFILE}.tar.gz" -C /emqx-rel/emqx; \
+  else \
+  if [ -f rebar-git-cache.tar ]; then \
+  mkdir .cache && \
+  tar -xf rebar-git-cache.tar -C .cache && \
+  export REBAR_GIT_CACHE_DIR='/emqx/.cache' && \
+  export REBAR_GIT_CACHE_REF_AUTOFILL=0; \
+  fi && \
+  export EMQX_REL_PATH="/emqx/_build/${PROFILE}/rel/emqx" && \
+  git config --global --add safe.directory '*' && \
+  if [ -n "${HTTP_PROXY}" ]; then git config --global http.proxy "${HTTP_PROXY}"; fi && \
+  make ${PROFILE}-tgz && \
+  tar zxf _packages/${PROFILE}/*.tar.gz -C /emqx-rel/emqx; \
+  fi
 
 FROM $RUN_FROM
 ARG EXTRA_DEPS=''
@@ -46,14 +54,14 @@ ARG EXTRA_DEPS=''
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 
-COPY deploy/docker/docker-entrypoint.sh /usr/bin/
-
 RUN set -eu; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends ca-certificates procps curl $(echo "${EXTRA_DEPS}" | tr ',' ' '); \
-    rm -rf /var/lib/apt/lists/*; \
-    groupadd -r -g 1000 emqx; \
-    useradd -r -m -u 1000 -g emqx emqx;
+  apt-get update; \
+  apt-get install -y --no-install-recommends ca-certificates procps curl dos2unix $(echo "${EXTRA_DEPS}" | tr ',' ' '); \
+  rm -rf /var/lib/apt/lists/*; \
+  groupadd -r -g 1000 emqx; \
+  useradd -r -m -u 1000 -g emqx emqx;
+
+COPY deploy/docker/docker-entrypoint.sh /usr/bin/
 
 COPY --from=builder --chown=emqx:emqx /emqx-rel /opt/
 

@@ -406,6 +406,8 @@ make_docker() {
        --build-arg SUFFIX="${SUFFIX}" \
        --build-arg EXTRA_DEPS="${EXTRA_DEPS}" \
        --build-arg PKG_VSN="${PKG_VSN}" \
+       --build-arg HTTP_PROXY="${http_proxy:-}" \
+       --build-arg HTTPS_PROXY="${https_proxy:-}" \
        --file "${EMQX_DOCKERFILE}" \
        --label org.opencontainers.image.title="${PROFILE%%-elixir}" \
        --label org.opencontainers.image.edition="${EDITION}" \
@@ -418,7 +420,7 @@ make_docker() {
        --label org.opencontainers.image.documentation="${DOCUMENTATION_URL}" \
        --label org.opencontainers.image.licenses="${LICENSE}" \
        --label org.opencontainers.image.otp.version="${OTP_VSN}" \
-       --pull
+       
     )
     :> ./.emqx_docker_image_tags
     for r in "${DOCKER_REGISTRIES[@]}"; do
@@ -474,6 +476,7 @@ make_docker() {
         echo '.vscode/'
         echo 'lux_logs/'
         echo '_upgrade_base/'
+        echo '.git/hooks/'
     } >> ./.dockerignore
     echo "Docker buildx args: ${DOCKER_BUILDX_ARGS[*]}"
     docker buildx build "${DOCKER_BUILDX_ARGS[@]}" .

@@ -1,9 +1,10 @@
-build text eol=lf
-* text=auto
-*.* text eol=lf
-./build text eol=lf
-scripts/* text eol=lf
+build text=auto eol=lf
+* text=auto eol=lf
+*.* text=auto eol=lf
+./build text=auto eol=lf
+scripts/* text=auto eol=lf
 *.cmd text eol=crlf
+*.bat text eol=crlf
 *.jpg -text
 *.png -text
 *.pdf -text
