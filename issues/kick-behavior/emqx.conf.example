@@ -1,0 +1,40 @@
+node {
+  name = "emqx@127.0.0.1"
+  cookie = "emqxsecretcookie"
+  data_dir = "data"
+}
+
+cluster {
+  discovery_strategy = singleton
+}
+
+dashboard {
+  listeners.http {
+    bind = 18083
+  }
+}
+
+listeners.tcp.default {
+  bind = "0.0.0.0:1883"
+}
+
+listeners.ssl.default {
+  bind = "0.0.0.0:8883"
+  ssl_options {
+    cacertfile = "${EMQX_ETC_DIR}/certs/cacert.pem"
+    certfile = "${EMQX_ETC_DIR}/certs/cert.pem"
+    keyfile = "${EMQX_ETC_DIR}/certs/key.pem"
+  }
+}
+
+# Enable Durable Sessions (Global)
+durable_sessions {
+  enable = true
+}
+
+# Configure Storage Backend (Built-in Local for Single Node)
+durable_storage {
+  messages {
+    backend = builtin_local
+  }
+}
