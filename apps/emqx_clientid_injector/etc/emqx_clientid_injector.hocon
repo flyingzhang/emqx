@@ -1,0 +1,52 @@
+## EMQX ClientId Injector Plugin Configuration
+
+clientid_injector {
+    ## 是否启用插件功能
+    ## 类型: boolean
+    ## 默认值: true
+    enable = true
+
+    ## ClientId 属性配置
+    properties {
+        ## ClientId 的 User Property 键名
+        ## 类型: string
+        ## 默认值: "x-emqx-clientid"
+        clientid_key = "x-emqx-clientid"
+
+        ## 是否注入 username
+        ## 类型: boolean
+        ## 默认值: false
+        inject_username = false
+
+        ## Username 的 User Property 键名
+        ## 类型: string
+        ## 默认值: "x-emqx-username"
+        username_key = "x-emqx-username"
+
+        ## 是否注入 peername (客户端 IP:Port)
+        ## 类型: boolean
+        ## 默认值: false
+        inject_peername = false
+
+        ## PeerName 的 User Property 键名
+        ## 类型: string
+        ## 默认值: "x-emqx-peername"
+        peername_key = "x-emqx-peername"
+    }
+
+    ## Topic 过滤配置
+    topic_filter {
+        ## 排除的 topic 前缀列表
+        ## 匹配这些前缀的消息不会被处理
+        ## 类型: array of string
+        ## 默认值: ["$SYS/", "$share/"]
+        exclude_prefixes = ["$SYS/", "$share/"]
+
+        ## 仅处理的 topic 前缀列表
+        ## 为空表示处理所有不在排除列表中的 topic
+        ## 不为空时,只处理匹配这些前缀的消息
+        ## 类型: array of string
+        ## 默认值: []
+        include_prefixes = []
+    }
+}

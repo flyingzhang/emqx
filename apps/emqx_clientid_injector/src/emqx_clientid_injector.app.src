@@ -1,0 +1,18 @@
+%% -*- mode: erlang -*-
+{application, emqx_clientid_injector, [
+    {description, "EMQX ClientId Injector Plugin"},
+    {vsn, "1.0.0"},
+    {registered, []},
+    {mod, {emqx_clientid_injector_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        emqx
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache 2.0"]},
+    {links, [
+        {"GitHub", "https://github.com/emqx/emqx"}
+    ]}
+]}.

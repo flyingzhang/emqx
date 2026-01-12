@@ -79,6 +79,7 @@
             emqx_mysql,
             emqx_postgresql,
             emqx_plugins,
+            emqx_clientid_injector,
             quicer,
             bcrypt
         ],

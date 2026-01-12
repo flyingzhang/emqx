@@ -1,0 +1,7 @@
+.rebar3/
+*_build/
+*.tar.gz
+*.ez
+erl_crash.dump
+*.beam
+.DS_Store
