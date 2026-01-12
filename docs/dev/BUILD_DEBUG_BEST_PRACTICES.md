@@ -104,3 +104,59 @@ Check schema with:
 ```bash
 docker exec <container> emqx eval "emqx_config:get([path, to, key])."
 ```
+
+## 6. Erlang 编码最佳实践
+
+### 6.1 Map 更新语法
+
+使用 `erlfmt` 格式化工具时，直接在函数调用后使用 map 更新语法可能导致解析错误。建议分两行写：
+
+```erlang
+% 避免（可能导致 erlfmt 解析错误）
+DisabledConfig = default_config()#{enable => false},
+
+% 推荐
+BaseConfig = default_config(),
+DisabledConfig = BaseConfig#{enable => false},
+```
+
+### 6.2 Case 表达式格式
+
+保持一致的缩进风格，提高代码可读性：
+
+```erlang
+% 推荐的格式
+Props2 =
+    case maps:get(inject_username, Config, false) of
+        true ->
+            UsernameKey = maps:get(username_key, Config, <<"x-emqx-username">>),
+            Username = get_client_username(ClientId),
+            [{UsernameKey, Username} | Props1];
+        false ->
+            Props1
+    end,
+```
+
+### 6.3 条件编译指令
+
+使用条件编译时，注意代码风格的统一性：
+
+```erlang
+-compile(export_all).
+-compile(nowarn_export_all).
+```
+
+### 6.4 调试日志使用
+
+使用 EMQX 的 SLOG 宏进行运行时调试：
+
+```erlang
+?SLOG(warning, #{msg => "DEBUG_MY_FUNCTION", var1 => Var1, var2 => Var2}),
+```
+
+查看日志：
+```bash
+docker logs <container> | grep DEBUG
+```
+
+> **注意**: 确保日志级别配置允许 SLOG 输出。

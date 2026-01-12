@@ -292,6 +292,106 @@ docker run --rm -v emqx_build_v588_otp26:/tmp/build ubuntu:24.04 ls -R /tmp/buil
 docker run --rm -v emqx_build_v588_otp26://tmp/build ubuntu:24.04 ls -R //tmp/build
 ```
 
+## 代码格式化
+
+### 在 Docker 中运行 erlfmt
+
+由于 `erlfmt` 工具在 Git Bash 环境中可能存在兼容性问题，推荐在 Docker 容器中运行代码格式化：
+
+```bash
+export MSYS_NO_PATHCONV=1
+
+# 格式化所有有变更的 Erlang 文件
+docker run --rm \
+  -v "$(pwd)":/emqx \
+  -w /emqx \
+  ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13 \
+  bash -c "ERLFMT_WRITE=true ./scripts/git-hook-pre-commit.sh"
+```
+
+### 格式化特定文件
+
+```bash
+export MSYS_NO_PATHCONV=1
+
+# 格式化单个或多个文件
+docker run --rm \
+  -v "$(pwd)":/emqx \
+  -w /emqx \
+  ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13 \
+  bash -c "./scripts/erlfmt -w apps/your_app/src/your_file.erl"
+```
+
+### 常见格式化问题
+
+**Map 更新语法**: erlfmt 对某些 Erlang 语法有特殊要求，建议分两行写：
+
+```erlang
+% 避免（可能导致格式化问题）
+DisabledConfig = default_config()#{enable => false},
+
+% 推荐
+BaseConfig = default_config(),
+DisabledConfig = BaseConfig#{enable => false},
+```
+
+## Git 提交与 Pre-commit Hook
+
+### Pre-commit Hook 处理
+
+EMQX 项目使用 pre-commit hook 进行代码风格检查和版本号验证。在 Windows + Docker 环境下需要注意：
+
+#### 1. 代码格式检查
+
+确保所有 `.erl` 文件已通过 erlfmt 格式化后再提交：
+
+```bash
+# 格式化代码（见上节）
+# ... 执行格式化 ...
+
+# 暂存格式化后的变更
+git add .
+
+# 提交
+git commit -m "your message"
+```
+
+#### 2. 版本号检查
+
+当修改了核心应用（如 `apps/emqx_machine/priv/reboot_lists.eterm`）时，pre-commit hook 会要求更新对应应用的版本号。
+
+**对于功能分支开发**，可以使用 `FORCE=true` 跳过版本检查：
+
+```bash
+FORCE=true git commit -m "feat: your feature"
+```
+
+> **注意**: 版本跳过检查仅适用于功能分支。发布版本前仍需确保版本号已正确更新。
+
+#### 3. 提交流程脚本
+
+为简化提交流程，可以创建包装脚本处理格式化和提交：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+export MSYS_NO_PATHCONV=1
+
+# 格式化代码
+docker run --rm \
+  -v "$(pwd)":/emqx \
+  -w /emqx \
+  ghcr.io/emqx/emqx-builder/5.6-2:1.15.7-26.2.5.14-1-debian13 \
+  bash -c "ERLFMT_WRITE=true ./scripts/git-hook-pre-commit.sh"
+
+# 暂存所有变更
+git add .
+
+# 提交（跳过版本检查）
+FORCE=true git commit -m "${1:-update}"
+```
+
 ## 性能优化建议
 
 1. **使用 Docker 卷**：将 `_build`、`deps`、`.mix`、`.cache` 挂载到 Docker 卷，避免 Windows 文件系统性能问题
@@ -308,11 +408,11 @@ docker run --rm -v emqx_build_v588_otp26://tmp/build ubuntu:24.04 ls -R //tmp/bu
 ## 版本信息
 
 本指引基于以下版本测试：
-- EMQX: v5.8.8
+- EMQX: v5.8.8 ~ v5.8.9
 - OTP: 26.2.5.14-1
 - Elixir: 1.15.7
-- Builder: ghcr.io/emqx/emqx-builder/5.6-1
+- Builder: ghcr.io/emqx/emqx-builder/5.6-1 / 5.6-2
 
 ---
 
-**最后更新**: 2025-12-31
+**最后更新**: 2026-01-12
